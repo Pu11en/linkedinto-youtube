@@ -24,14 +24,12 @@ async function fetchTranscriptFromApify(videoId) {
   console.log(`[Transcript] Running Apify scraper for: ${videoId}`);
 
   const response = await fetch(
-    `https://api.apify.com/v2/acts/apify~youtube-transcript-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}`,
+    `https://api.apify.com/v2/acts/pintostudio~youtube-transcript-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        videoUrls: [videoUrl],
-        subtitlesFormat: 'plain_text',
-        maxRetries: 3
+        videoUrl: videoUrl
       })
     }
   );
@@ -42,11 +40,15 @@ async function fetchTranscriptFromApify(videoId) {
   }
 
   const items = await response.json();
-  if (items && items.length > 0 && items[0].transcript) {
-    return items[0].transcript;
+  // Items will be an array of segments: [{start, dur, text}, ...]
+  if (items && items.length > 0) {
+    const fullText = items.map(item => item.text).join(' ');
+    if (fullText.trim().length > 0) {
+      return fullText;
+    }
   }
 
-  throw new Error('Apify succeeded but returned no transcript');
+  throw new Error('Apify succeeded but returned no transcript text');
 }
 
 export async function GET(request) {
