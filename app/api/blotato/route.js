@@ -74,7 +74,12 @@ export async function POST(request) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = await response.text();
+      }
       console.error('Blotato API error:', errorData);
       return NextResponse.json({
         error: 'Blotato API error',

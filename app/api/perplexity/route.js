@@ -118,9 +118,23 @@ Rules for LinkedIn caption:
       });
     } catch (parseError) {
       // If JSON parsing fails, create structured content from the text
-      console.error('JSON parse error, using fallback:', parseError);
+      console.error('JSON parse error. Raw content:', content);
+      console.error('Parse error:', parseError);
 
-      // Split content into slides manually
+      // Check for refusal messages
+      const lowerContent = content.toLowerCase();
+      if (lowerContent.startsWith("i'm unable") ||
+        lowerContent.startsWith("i cannot") ||
+        lowerContent.startsWith("i can't") ||
+        lowerContent.startsWith("i am sorry")) {
+        return NextResponse.json({
+          error: 'Perplexity refused to generate content',
+          details: content,
+          refusal: true
+        }, { status: 422 });
+      }
+
+      // Split content into slides manually as fallback
       const lines = content.split('\n').filter(line => line.trim());
       const slides = lines.slice(0, 8).map(line =>
         line.replace(/^\d+[\.\)]\s*/, '').replace(/^[-*]\s*/, '').trim()

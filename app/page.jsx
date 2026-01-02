@@ -62,7 +62,10 @@ export default function Home() {
   const fetchTranscript = async (videoId) => {
     setProcessingStatus('Fetching YouTube transcript...');
     const response = await fetch(`/api/transcript?videoId=${videoId}`);
-    if (!response.ok) throw new Error('Failed to fetch transcript');
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || 'Failed to fetch transcript');
+    }
     const data = await response.json();
     return data.transcript;
   };
@@ -77,7 +80,10 @@ export default function Home() {
         apiKey: config.perplexityKey
       })
     });
-    if (!response.ok) throw new Error('Failed to enrich content');
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || 'Failed to enrich content');
+    }
     const data = await response.json();
     return data;
   };
@@ -144,7 +150,16 @@ export default function Home() {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to create carousel');
+      if (!response.ok) {
+        let errMsg = 'Failed to create carousel';
+        try {
+          const errData = await response.json();
+          errMsg = errData.error || errMsg;
+        } catch (e) {
+          // ignore
+        }
+        throw new Error(errMsg);
+      }
 
       const data = await response.json();
 
