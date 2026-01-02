@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+export const maxDuration = 60; // Allow 60s for slow AI responses
+export const dynamic = 'force-dynamic';
+
 export async function POST(request) {
   try {
     const { transcript, apiKey: requestApiKey } = await request.json();

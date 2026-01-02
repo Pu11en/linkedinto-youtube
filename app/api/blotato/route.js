@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
 const BLOTATO_API_BASE = 'https://backend.blotato.com/v2';
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   try {
