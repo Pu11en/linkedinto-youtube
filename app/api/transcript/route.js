@@ -8,6 +8,7 @@ import os from 'os';
 
 // Force dynamic to prevent caching of "past URLs"
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow more time for audio processing
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -19,27 +20,13 @@ export async function GET(request) {
 
   try {
     console.log(`[Transcript] Processing video: ${videoId}`);
+    let transcriptData = null;
 
-    // LAYER 1: Standard Captions (Fastest, Free)
-    try {
-      console.log('[Transcript] Layer 1: Attempting youtube-transcript...');
-      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
-      const transcript = transcriptItems.map(item => item.text).join(' ');
-
-      console.log('[Transcript] Layer 1 Success: Captions found.');
-      return NextResponse.json({
-        transcript,
-        type: 'transcript',
-        videoId
-      });
-    } catch (transcriptError) {
-      console.warn('[Transcript] Layer 1 Failed:', transcriptError.message);
-    }
-
-    // LAYER 2: Whisper Audio Transcription (Slower, Paid, Reliable)
+    // LAYER 1: Whisper Audio Transcription (PRIMARY)
+    // We prioritize this because it's 100% reliable and avoids "disabled caption" errors.
     if (process.env.OPENAI_API_KEY) {
       try {
-        console.log('[Transcript] Layer 2: Attempting Whisper transcription...');
+        console.log('[Transcript] Layer 1: Attempting Whisper transcription (Primary)...');
 
         // 1. Get Audio Stream URL
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
@@ -49,7 +36,6 @@ export async function GET(request) {
         if (!format) throw new Error('No audio format found');
 
         // 2. Download audio to temp file
-        // We must write to file because OpenAI SDK needs a file stream with path/name
         const tempPath = path.join(os.tmpdir(), `${videoId}_${Date.now()}.mp3`);
         console.log(`[Transcript] Downloading audio to ${tempPath}...`);
 
@@ -69,26 +55,42 @@ export async function GET(request) {
         const transcription = await openai.audio.transcriptions.create({
           file: fs.createReadStream(tempPath),
           model: 'whisper-1',
-          response_format: 'text', // just get plain text
+          response_format: 'text',
         });
 
         // Cleanup temp file
         fs.unlinkSync(tempPath);
 
-        console.log('[Transcript] Layer 2 Success: Audio transcribed.');
+        console.log('[Transcript] Layer 1 Success: Audio transcribed.');
+
         return NextResponse.json({
           transcript: transcription,
           type: 'generated_transcript',
           videoId,
-          warning: 'Captions were disabled. This content was auto-generated from the video audio (took ~30s).'
         });
 
       } catch (whisperError) {
-        console.error('[Transcript] Layer 2 Failed:', whisperError);
-        // Fallthrough to Layer 3
+        console.error('[Transcript] Layer 1 Failed:', whisperError.message);
+        // Fallthrough to Layer 2
       }
     } else {
-      console.warn('[Transcript] Layer 2 Skipped: No OPENAI_API_KEY provided.');
+      console.warn('[Transcript] Layer 1 Skipped: No OPENAI_API_KEY provided.');
+    }
+
+    // LAYER 2: Standard Captions (Fallback)
+    try {
+      console.log('[Transcript] Layer 2: Attempting youtube-transcript fallback...');
+      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
+      const transcript = transcriptItems.map(item => item.text).join(' ');
+
+      console.log('[Transcript] Layer 2 Success: Captions found.');
+      return NextResponse.json({
+        transcript,
+        type: 'transcript',
+        videoId
+      });
+    } catch (transcriptError) {
+      console.warn('[Transcript] Layer 2 Failed:', transcriptError.message);
     }
 
     // LAYER 3: Metadata Fallback (Last Resort)
@@ -119,7 +121,7 @@ Note: This video does not have closed captions available. This content is based 
       transcript: metadataSummary,
       type: 'metadata',
       videoId,
-      warning: 'No captions or audio could be extracted. Using video summary.'
+      warning: 'No transcripts or audio could be extracted. Using video summary.'
     });
 
   } catch (error) {
