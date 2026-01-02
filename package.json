@@ -1,0 +1,17 @@
+{
+  "name": "youtube-carousel-app",
+  "version": "1.0.0",
+  "description": "Convert YouTube AI videos to Instagram carousels",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "youtube-transcript": "^1.2.1"
+  }
+}
