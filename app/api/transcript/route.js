@@ -9,6 +9,22 @@ const client = new AssemblyAI({
   apiKey: process.env.ASSEMBLY_AI_API_KEY
 });
 
+// Create agent for ytdl-core to bypass bot detection
+// If YOUTUBE_COOKIES is set (JSON array format), use it.
+const getAgent = () => {
+  try {
+    if (process.env.YOUTUBE_COOKIES) {
+      const cookies = JSON.parse(process.env.YOUTUBE_COOKIES);
+      return ytdl.createAgent(cookies);
+    }
+  } catch (e) {
+    console.error('[Transcript] Failed to parse YOUTUBE_COOKIES:', e.message);
+  }
+  return ytdl.createAgent(); // Returns a default agent with better headers
+};
+
+const agent = getAgent();
+
 /**
  * AssemblyAI-powered YouTube Transcript API
  * Downloads audio via ytdl and transcribes via AssemblyAI.
@@ -27,7 +43,10 @@ export async function GET(request) {
   try {
     // 1. Get the audio stream URL
     console.log('[Transcript] Step 1: Getting audio stream URL...');
-    const info = await ytdl.getInfo(videoUrl);
+
+    // Use the hardened agent to bypass bot detection
+    const info = await ytdl.getInfo(videoUrl, { agent });
+
     const audioFormat = ytdl.chooseFormat(info.formats, {
       quality: 'lowestaudio',
       filter: 'audioonly'
@@ -63,7 +82,9 @@ export async function GET(request) {
     // Metadata Fallback if transcription fails
     try {
       console.log('[Transcript] Falling back to metadata...');
-      const info = await ytdl.getBasicInfo(videoUrl);
+      // Basic info is usually more resilient
+      const info = await ytdl.getBasicInfo(videoUrl, { agent });
+
       const title = info.videoDetails.title;
       const description = info.videoDetails.description;
 
@@ -73,7 +94,7 @@ VIDEO TITLE: ${title}
 VIDEO DESCRIPTION:
 ${description}
 
-[Note: Audio transcription failed. This content is generated from video metadata.]
+[Note: Audio transcription failed due to bot detection or API error. Using metadata fallback.]
       `.trim();
 
       return NextResponse.json({
@@ -83,9 +104,11 @@ ${description}
         warning: `Transcription failed: ${error.message}. Using metadata fallback.`
       });
     } catch (fallbackError) {
+      console.error('[Transcript] Fallback also failed:', fallbackError);
       return NextResponse.json({
         error: 'Failed to fetch video content or metadata',
-        details: error.message
+        details: error.message,
+        fallbackError: fallbackError.message
       }, { status: 500 });
     }
   }
