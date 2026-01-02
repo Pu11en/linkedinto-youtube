@@ -35,11 +35,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# debug/temporary
-api_response.json
-*-player-script.js
-test-*.js
-scripts/test-*.js
-scripts/debug-*.js
-scripts/verify-*.js
