@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -9,73 +10,66 @@ export async function GET(request) {
   }
 
   try {
-    // Use youtube-transcript API or fallback to YouTube's timedtext API
-    // First try the unofficial transcript endpoint
-    const transcriptUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    // 1. Try to fetch the actual closed captions (most reliable source)
+    try {
+      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
 
-    // Fetch the video page to get transcript data
-    const pageResponse = await fetch(transcriptUrl);
-    const pageHtml = await pageResponse.text();
-
-    // Extract captions URL from the page
-    const captionMatch = pageHtml.match(/"captionTracks":\s*\[(.*?)\]/);
-
-    if (!captionMatch) {
-      // Fallback: try to get auto-generated captions
-      const autoMatch = pageHtml.match(/"playerCaptionsTracklistRenderer":\s*\{[^}]*"captionTracks":\s*\[(.*?)\]/s);
-
-      if (!autoMatch) {
-        return NextResponse.json({
-          error: 'No captions available for this video'
-        }, { status: 404 });
-      }
-    }
-
-    // Try to extract transcript using a more reliable method
-    // Parse for timedtext URL
-    const timedTextMatch = pageHtml.match(/https:\/\/www\.youtube\.com\/api\/timedtext[^"]+/);
-
-    if (timedTextMatch) {
-      let timedTextUrl = timedTextMatch[0].replace(/\\u0026/g, '&');
-
-      const transcriptResponse = await fetch(timedTextUrl);
-      const transcriptXml = await transcriptResponse.text();
-
-      // Parse XML transcript
-      const textMatches = transcriptXml.matchAll(/<text[^>]*>(.*?)<\/text>/gs);
-      const transcriptParts = [];
-
-      for (const match of textMatches) {
-        let text = match[1]
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/\n/g, ' ')
-          .trim();
-        if (text) transcriptParts.push(text);
-      }
-
-      const transcript = transcriptParts.join(' ');
+      const transcript = transcriptItems.map(item => item.text).join(' ');
 
       return NextResponse.json({
-        transcript: transcript || 'Transcript extracted but appears empty.',
+        transcript,
+        type: 'transcript',
         videoId
       });
+    } catch (transcriptError) {
+      console.warn('Transcript fetch failed, falling back to metadata:', transcriptError.message);
+      // Fallthrough to metadata extraction
     }
 
-    // If no transcript found, return helpful message
-    // If no transcript found, return error
+    // 2. Fallback: Extract Title, Description, and Keywords from the video page
+    // This ensures we always have *some* content to work with, even if captions are missing.
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const pageResponse = await fetch(videoUrl);
+    const html = await pageResponse.text();
+
+    // Extract Title
+    const titleMatch = html.match(/<title>(.*?)<\/title>/) ||
+      html.match(/"title":\{"runs":\[\{"text":"(.*?)"\}\]/);
+    const title = titleMatch ? titleMatch[1].replace(' - YouTube', '') : 'Unknown Video';
+
+    // Extract Description
+    // YouTube stores description in complex JSON objects in the HTML, or sometimes simple meta tags
+    const descMatch = html.match(/"shortDescription":"(.*?)"/) ||
+      html.match(/<meta name="description" content="(.*?)">/);
+    const description = descMatch ? descMatch[1].replace(/\\n/g, '\n') : '';
+
+    // Extract Keywords
+    const keywordsMatch = html.match(/<meta name="keywords" content="(.*?)">/);
+    const keywords = keywordsMatch ? keywordsMatch[1] : '';
+
+    const metadataSummary = `
+VIDEO TITLE: ${title}
+
+VIDEO DESCRIPTION:
+${description}
+
+KEYWORDS:
+${keywords}
+
+Note: This video does not have closed captions available. This content is based on the video's metadata summary.
+    `.trim();
+
     return NextResponse.json({
-      error: 'Could not automatically extract transcript. Please ensure the video has captions enabled.',
-      videoId
-    }, { status: 404 });
+      transcript: metadataSummary,
+      type: 'metadata',
+      videoId,
+      warning: 'No closed captions found. Content generated from video summary.'
+    });
 
   } catch (error) {
-    console.error('Transcript extraction error:', error);
+    console.error('Transcript/Metadata extraction error:', error);
     return NextResponse.json({
-      error: 'Failed to fetch transcript',
+      error: 'Failed to fetch video content',
       details: error.message
     }, { status: 500 });
   }

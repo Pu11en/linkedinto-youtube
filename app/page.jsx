@@ -14,7 +14,9 @@ export default function Home() {
   const [cta, setCta] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [carouselResult, setCarouselResult] = useState(null);
+
   const [selectedTemplate, setSelectedTemplate] = useState('quote-cards-paper');
   const [processingStatus, setProcessingStatus] = useState('');
   const [postToLinkedIn, setPostToLinkedIn] = useState(false);
@@ -67,7 +69,7 @@ export default function Home() {
       throw new Error(errData.error || 'Failed to fetch transcript');
     }
     const data = await response.json();
-    return data.transcript;
+    return data;
   };
 
   const enrichWithPerplexity = async (transcriptText) => {
@@ -104,11 +106,17 @@ export default function Home() {
     }
 
     setError('');
+    setWarning('');
     setStep('processing');
 
     try {
-      const transcriptText = await fetchTranscript(videoId);
+      const transcriptData = await fetchTranscript(videoId);
+      const transcriptText = transcriptData.transcript;
       setTranscript(transcriptText);
+
+      if (transcriptData.type === 'metadata') {
+        setWarning(transcriptData.warning || 'No captions found. Using video summary.');
+      }
 
       const enriched = await enrichWithPerplexity(transcriptText);
       setEnrichedContent(enriched.analysis);
@@ -455,6 +463,16 @@ export default function Home() {
           background: #fef2f2;
           border: 1px solid #fecaca;
           color: #dc2626;
+          padding: 1rem;
+          border-radius: 10px;
+          margin-bottom: 1.25rem;
+          font-size: 0.875rem;
+        }
+
+        .warning {
+          background: #fffbeb;
+          border: 1px solid #fcd34d;
+          color: #92400e;
           padding: 1rem;
           border-radius: 10px;
           margin-bottom: 1.25rem;
@@ -897,6 +915,7 @@ export default function Home() {
         </div>
 
         {error && <div className="error">{error}</div>}
+        {warning && <div className="warning">⚠️ {warning}</div>}
 
         {step === 'input' && (
           <div className="card">
