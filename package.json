@@ -9,11 +9,17 @@
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
+    "@playzone/youtube-transcript": "^1.0.0",
+    "assemblyai": "^4.22.1",
     "dotenv": "^17.2.3",
+    "http-proxy": "^1.18.1",
     "next": "^14.0.0",
-    "openai": "^6.15.0",
+    "node-fetch": "^2.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "youtube-transcript": "^1.2.1"
+    "youtube-transcript": "^1.2.1",
+    "youtube-video-transcript": "^1.0.6",
+    "yt-transcript": "^0.0.2",
+    "ytdl-core": "^4.11.5"
   }
 }

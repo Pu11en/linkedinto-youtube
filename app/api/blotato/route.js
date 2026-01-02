@@ -15,7 +15,8 @@ export async function POST(request) {
       handle,
       profileImage,
       theme,
-      aspectRatio
+      aspectRatio,
+      font
     } = await request.json();
 
     const apiKey = request.headers.get('x-api-key') || requestApiKey || process.env.BLOTATO_API_KEY;
@@ -42,6 +43,7 @@ export async function POST(request) {
         verified: true,
         theme: theme || 'dark',
         aspectRatio: aspectRatio || '4:5',
+        font: font || 'Montserrat',
       };
 
       if (profileImage) {
@@ -54,7 +56,7 @@ export async function POST(request) {
       templateInputs = {
         ...templateInputs,
         title: title || 'AI Insights',
-        font: 'Philosopher',
+        font: font || 'Philosopher',
       };
 
       // Add paper background for paper-based templates

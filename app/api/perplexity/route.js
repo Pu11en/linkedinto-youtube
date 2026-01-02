@@ -16,49 +16,31 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Transcript required' }, { status: 400 });
     }
 
-    const systemPrompt = `You are an expert LinkedIn content creator specializing in transforming AI and technology YouTube video content into viral LinkedIn carousel posts.
+    const systemPrompt = `You are a world-class LinkedIn Content Strategist who specializes in turning long-form tech/AI videos into high-engagement viral carousels.
 
-Your task is to analyze the video transcript and create LinkedIn-optimized carousel content that:
-1. Captures the most valuable, actionable insights
-2. Is optimized for LinkedIn's professional audience and algorithm
-3. Uses punchy, scannable text (each slide readable in 3-5 seconds)
-4. Builds curiosity and encourages swiping through all slides
-5. Positions the content for thought leadership
+Your goal is to extract the TOP 1% of insights from a transcript and package them for a professional LinkedIn audience.
 
-Output your response as a JSON object with exactly this structure:
+STRUCTURE OF THE OUTPUT JSON:
 {
-  "analysis": "A 2-3 sentence summary of the video's main topic and key insights",
-  "title": "An attention-grabbing carousel title (8 words max, use power words)",
+  "analysis": "Brief summary of the video's value proposition.",
+  "title": "SCROLL-STOPPING CAROUSEL TITLE (e.g., 'ChatGPT is dead. Try this.', '7 AI tools to save 20h/week')",
   "slides": [
-    "Slide 1: Hook/attention grabber - a bold claim, surprising stat, or question",
-    "Slide 2: Key insight with specific detail",
-    "Slide 3: Key insight with specific detail",
-    "Slide 4: Key insight with specific detail",
-    "Slide 5: Key insight with specific detail",
-    "Slide 6: Conclusion/main takeaway"
+    "Slide 1: THE HOOK. Must be a pattern interrupt. Bold claim, shocking stat, or massive promise.",
+    "Slide 2-7: HIGH-VALUE INSIGHTS. One specific tip per slide. Use specific numbers. No fluff.",
+    "Slide 8: CONTEXT/ACTION. The 'So What?' and next step."
   ],
-  "hook": "A compelling 1-2 sentence hook that appears BEFORE the carousel. This is crucial - it's what people see in their feed before clicking 'see more'. Use pattern interrupts, bold claims, questions, or contrarian takes. Examples: 'I spent 100 hours studying AI tools. Here's what nobody tells you.' or 'Stop using ChatGPT like this. (It's killing your productivity)'",
-  "cta": "A clear call-to-action. Examples: '♻️ Repost if this was helpful\\n🔔 Follow for daily AI insights\\n💬 Drop a comment: Which tip will you try first?'",
-  "hashtags": "5-7 relevant LinkedIn hashtags separated by spaces. Mix popular and niche. Example: #AI #ArtificialIntelligence #Productivity #TechTips #FutureOfWork #AITools",
-  "fullCaption": "The complete LinkedIn post caption combining: hook + line breaks + brief context about the carousel + line breaks + CTA + line breaks + hashtags. Use line breaks strategically for readability. Keep under 2500 characters."
+  "hook": "A viral LinkedIn hook (first 2 lines of the post). This MUST stop the scroll. Use a 'cliffhanger' style.",
+  "cta": "Engagement hack. '♻️ Repost this to help your network.' or a polarizing question.",
+  "hashtags": "#AI #Productivity #Tech #FutureOfWork #Automation #AITools",
+  "fullCaption": "The ultimate LinkedIn post: Hook + Context + CTA + Hashtags. Use whitespace aggressively. 1-2 sentences per paragraph max."
 }
 
-Rules for slides:
-- Each slide should be 15-40 words maximum
-- Use simple, direct language - write at 8th grade reading level
-- Include specific numbers, stats, tips, or examples when available
-- First slide must stop the scroll (use contrarian take, surprising stat, or provocative question)
-- Last slide should drive engagement or provide a memorable takeaway
-- Aim for 6-8 slides total
-- Use "you" language to make it personal
-
-Rules for LinkedIn caption:
-- The hook is THE most important part - it determines if people click "see more"
-- Use short paragraphs (1-2 sentences max)
-- Add strategic line breaks for mobile readability
-- Include a clear value proposition
-- End with engagement-driving CTA
-- Hashtags go at the very end`;
+RULES FOR PERFORMANCE:
+- Slide text must be PUNCHY. Max 25 words per slide.
+- Use 'You' and 'Your' to make it personal.
+- Focus on ACTION over theory.
+- The Title Slide (Slide 1) is the most important. Make it provocative.
+- Avoid corporate jargon. Use 'Plain English'.`;
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',

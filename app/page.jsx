@@ -19,6 +19,8 @@ export default function Home() {
 
   const [selectedTemplate, setSelectedTemplate] = useState('quote-cards-paper');
   const [processingStatus, setProcessingStatus] = useState('');
+  const [activeSubStep, setActiveSubStep] = useState(0); // 0: transcript, 1: AI, 2: carousel
+  const [magicMode, setMagicMode] = useState(true);
   const [postToLinkedIn, setPostToLinkedIn] = useState(false);
 
   // Config state
@@ -62,7 +64,7 @@ export default function Home() {
   };
 
   const fetchTranscript = async (videoId) => {
-    setProcessingStatus('Fetching YouTube transcript...');
+    setProcessingStatus('AI is transcribing the video... this usually takes 30-60 seconds.');
     const response = await fetch(`/api/transcript?videoId=${videoId}`);
     if (!response.ok) {
       const errData = await response.json();
@@ -110,6 +112,7 @@ export default function Home() {
     setStep('processing');
 
     try {
+      setActiveSubStep(0);
       const transcriptData = await fetchTranscript(videoId);
       const transcriptText = transcriptData.transcript;
       setTranscript(transcriptText);
@@ -118,6 +121,7 @@ export default function Home() {
         setWarning(transcriptData.warning || 'No captions found. Using video summary.');
       }
 
+      setActiveSubStep(1);
       const enriched = await enrichWithPerplexity(transcriptText);
       setEnrichedContent(enriched.analysis);
       setCarouselSlides(enriched.slides);
@@ -127,10 +131,54 @@ export default function Home() {
       setHashtags(enriched.hashtags);
       setCaption(enriched.fullCaption);
 
-      setStep('review');
+      if (magicMode) {
+        setActiveSubStep(2);
+        await handleGenerateCarouselDirect(enriched.slides, enriched.title);
+      } else {
+        setStep('review');
+      }
     } catch (err) {
       setError(err.message);
       setStep('input');
+    }
+  };
+
+  const handleGenerateCarouselDirect = async (slides, carouselTitle) => {
+    setProcessingStatus('Creating carousel with Blotato...');
+    try {
+      const template = templates.find(t => t.id === selectedTemplate);
+      const response = await fetch('/api/blotato', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: config.blotatoKey,
+          templateId: template.templateId,
+          quotes: slides,
+          title: carouselTitle,
+          authorName: config.authorName,
+          handle: config.handle,
+          profileImage: config.profileImage,
+          theme: config.theme,
+          aspectRatio: config.aspectRatio,
+          font: config.font
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to create carousel');
+      const data = await response.json();
+      setProcessingStatus('Waiting for carousel to render...');
+      let carousel = await pollForCarousel(data.id);
+
+      if (postToLinkedIn && config.linkedinAccountId) {
+        setProcessingStatus('Posting to LinkedIn...');
+        await postToLinkedInApi(carousel.imageUrls);
+      }
+
+      setCarouselResult(carousel);
+      setStep('complete');
+    } catch (err) {
+      setError(err.message);
+      setStep('review');
     }
   };
 
@@ -768,6 +816,130 @@ export default function Home() {
         .char-count.error {
           color: #dc2626;
         }
+
+        .magic-toggle-container {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1rem;
+          background: #fdf4ff;
+          border: 1px solid #f5d0fe;
+          border-radius: 12px;
+          margin-bottom: 1.5rem;
+        }
+
+        .magic-title {
+          font-weight: 700;
+          font-size: 0.9rem;
+          color: #86198f;
+        }
+
+        .magic-desc {
+          font-size: 0.75rem;
+          color: #a21caf;
+        }
+
+        .steps-checklist {
+          max-width: 320px;
+          margin: 0 auto;
+          text-align: left;
+        }
+
+        .step-row {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin-bottom: 1rem;
+          opacity: 0.4;
+          transition: all 0.3s;
+        }
+
+        .step-row.active {
+          opacity: 1;
+        }
+
+        .step-row.done {
+          color: #16a34a;
+        }
+
+        .step-check {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          border: 2px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.75rem;
+          font-weight: 700;
+        }
+
+        .step-row.active .step-check {
+          border-color: #0077b5;
+          color: #0077b5;
+        }
+
+        .step-row.done .step-check {
+          background: #16a34a;
+          border-color: #16a34a;
+          color: #fff;
+        }
+
+        /* Switch styles */
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 44px;
+          height: 24px;
+        }
+
+        .switch input { 
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #e2e8f0;
+          transition: .4s;
+        }
+
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 18px;
+          width: 18px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          transition: .4s;
+        }
+
+        input:checked + .slider {
+          background-color: #d946ef;
+        }
+
+        input:focus + .slider {
+          box-shadow: 0 0 1px #d946ef;
+        }
+
+        input:checked + .slider:before {
+          transform: translateX(20px);
+        }
+
+        .slider.round {
+          border-radius: 24px;
+        }
+
+        .slider.round:before {
+          border-radius: 50%;
+        }
       `}</style>
 
       <button className="btn btn-secondary config-toggle" onClick={() => setShowConfig(true)}>
@@ -919,28 +1091,58 @@ export default function Home() {
 
         {step === 'input' && (
           <div className="card">
-            <h2 className="card-title" style={{ marginBottom: '0.25rem' }}>Enter YouTube Video URL</h2>
-            <p className="card-subtitle" style={{ marginBottom: '1.25rem' }}>Paste a link to an AI or tech video you want to repurpose</p>
             <div className="input-group">
+              <label className="label">YouTube Video URL</label>
               <input
                 type="text"
-                className="input input-mono"
+                className="input"
                 placeholder="https://www.youtube.com/watch?v=..."
                 value={youtubeUrl}
                 onChange={e => setYoutubeUrl(e.target.value)}
               />
             </div>
+
+            <div className="magic-toggle-container">
+              <div className="magic-info">
+                <div className="magic-title">✨ Magic Mode (Auto-Pilot)</div>
+                <div className="magic-desc">Automatically generate carousel and copy in one click</div>
+              </div>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={magicMode}
+                  onChange={e => setMagicMode(e.target.checked)}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
+
             <button className="btn btn-primary btn-full" onClick={handleProcess}>
-              🚀 Process Video
+              {magicMode ? 'Generate Viral Carousel ✨' : 'Process Video'}
             </button>
           </div>
         )}
 
         {step === 'processing' && (
-          <div className="card">
-            <div className="processing">
-              <div className="spinner"></div>
-              <p className="processing-text">{processingStatus}</p>
+          <div className="card processing">
+            <div className="spinner"></div>
+            <h3 style={{ marginBottom: '1.5rem' }}>{processingStatus}</h3>
+
+            <div className="steps-checklist">
+              <div className={`step-row ${activeSubStep >= 0 ? 'active' : ''} ${activeSubStep > 0 ? 'done' : ''}`}>
+                <div className="step-check">{activeSubStep > 0 ? '✓' : '1'}</div>
+                <div className="step-label">AI Transcription (AssemblyAI)</div>
+              </div>
+              <div className={`step-row ${activeSubStep >= 1 ? 'active' : ''} ${activeSubStep > 1 ? 'done' : ''}`}>
+                <div className="step-check">{activeSubStep > 1 ? '✓' : '2'}</div>
+                <div className="step-label">Content Enrichment (Perplexity)</div>
+              </div>
+              {magicMode && (
+                <div className={`step-row ${activeSubStep >= 2 ? 'active' : ''} ${step === 'complete' ? 'done' : ''}`}>
+                  <div className="step-check">{step === 'complete' ? '✓' : '3'}</div>
+                  <div className="step-label">Carousel Generation (Blotato)</div>
+                </div>
+              )}
             </div>
           </div>
         )}
